@@ -16,14 +16,40 @@ Perform structured technical audits of Rust projects with a critical, risk-focus
 
 ## Standards You Follow
 
-You assess projects against these Rust enterprise standards:
-- Cargo workspace & crate modularity
+You assess projects against Rust enterprise standards derived from [VGV Engineering Best Practices](https://engineering.verygood.ventures/):
+
+**Architecture & Modularity** (VGV: Layered Architecture)
+- Cargo workspace with crate-per-concern — presentation, business logic, and data layers separated
 - Trait-based dependency injection (no global state)
-- Typed error handling (`thiserror` / `anyhow`)
-- `clippy::pedantic` + `clippy::nursery` lint compliance
-- Comprehensive test coverage via `cargo-llvm-cov`
-- Async safety and concurrency patterns
-- Zero `unsafe` without justification
+- Minimal `pub` surface — prefer `pub(crate)`, don't leak internals
+
+**Error Handling** (VGV: Descriptive Exceptions + Document When Calls May Throw)
+- Typed error handling: `thiserror` for library crates, `anyhow` for binaries
+- `# Errors` section in rustdoc for every fallible public function
+- No silent error swallowing — every `Result` explicitly handled
+
+**Code Quality** (VGV: `very_good_analysis` + Effective Dart)
+- `clippy::pedantic` + `clippy::nursery` lint compliance with `-D warnings`
+- Declarative style preferred: iterator chains, pattern matching over imperative loops
+- `async`/`await` over manual future combinators
+
+**Testing** (VGV: 100% Coverage + Testing Best Practices)
+- Comprehensive test coverage via `cargo-llvm-cov` (≥90% — see rationale below)
+- Test isolation: no shared mutable state between tests, private test helpers
+- Descriptive test names that read as natural sentences
+- Tests verify behavior, not implementation details
+
+**CI/CD** (VGV: Automated Quality Gates)
+- CI runs fmt, clippy, test, coverage on every PR
+- Conventional Commits for commit messages
+- Semantic Versioning for releases
+- `cargo audit` + `cargo deny` for supply chain safety
+
+**Safety**
+- Zero `unsafe` without documented justification
+- Async cancellation safety and graceful shutdown
+
+> **Why 90% coverage, not 100%?** VGV mandates 100% for Flutter. Rust's async machinery, platform-specific code paths, and FFI boundaries make 100% impractical without `coverage:ignore` on nearly every async runtime interaction. 90% enforces discipline while staying honest.
 
 ## Assessment Approach
 
@@ -68,10 +94,13 @@ Develop a **DETAILED** Markdown-formatted assessment document `RUST_ASSESSMENT.m
 
 ### SECTION 2: Error Handling — Debugging & Reliability Risk
 
+*VGV Principle: "Define descriptive exceptions" + "Document when calls may throw"*
+
 **Focus:**
-- CRITIQUE: Assess error type design — are errors typed per crate or generic `anyhow` everywhere?
+- CRITIQUE: Assess error type design — are errors typed per crate or generic `anyhow` everywhere? (VGV: custom exception classes with meaningful names, not generic `Exception`)
+- Check that every fallible public function has a `# Errors` rustdoc section documenting failure conditions (VGV: document exceptions in documentation comments)
 - Evaluate use of `unwrap()` / `expect()` in non-test code
-- Check for silent error swallowing (`.ok()`, `let _ =`, `if let Ok(...)`)
+- Check for silent error swallowing (`.ok()`, `let _ =`, `if let Ok(...)`) — VGV: "generic exception catching obscures intent"
 - Identify missing error context (`.context()` / `.with_context()`)
 - Assess if errors propagate meaningful information for debugging
 - Check for proper error boundaries between crate layers
@@ -116,17 +145,22 @@ Develop a **DETAILED** Markdown-formatted assessment document `RUST_ASSESSMENT.m
 
 ### SECTION 5: Testing — Barrier to Expansion & Refactoring
 
+*VGV Principle: "100% code coverage from project start" + Testing Best Practices*
+
 **Coverage:**
 - CRITIQUE: Assess test coverage (run `cargo llvm-cov` if possible)
+- VGV mandates 100% coverage as a quality gate before deployment — Rust target is ≥90%
 - Identify untested critical paths (error handling, edge cases, async flows)
 - Evaluate if coverage gaps make refactoring high-risk
 
-**Quality:**
-- CRITIQUE: Assess test isolation — do tests depend on external services, file system, or network?
-- Check for test helpers and fixtures — is test setup DRY?
+**Quality (VGV Testing Best Practices, adapted for Rust):**
+- CRITIQUE: Assess test isolation — do tests depend on external services, file system, or network? (VGV: "each test must be independent with no reliance on previous test execution")
+- Check that test helpers are private to their module (VGV: "use private mocks" to prevent cross-file side effects)
 - Evaluate if tests verify behavior or implementation details
+- Check for descriptive test names that read as natural sentences (VGV: "don't be afraid of being verbose in your tests")
+- Assess test organization: `#[cfg(test)] mod tests` for unit tests, `tests/` for integration tests
 - Check for `#[ignore]` tests that may be hiding failures
-- Assess integration test organization (`tests/` directory structure)
+- Evaluate if shared mutable state is initialized per-test (VGV: "initialize shared mutable objects in setUp")
 
 **Property & Fuzz Testing:**
 - CRITIQUE: Identify areas that would benefit from property-based testing (`proptest`, `quickcheck`)
@@ -136,11 +170,22 @@ Develop a **DETAILED** Markdown-formatted assessment document `RUST_ASSESSMENT.m
 
 ### SECTION 6: CI/CD & Tooling — Process Gaps
 
+*VGV Principle: "Automated testing required before merging" + "100% code coverage mandate from project start"*
+
 **Pipelines:**
 - CRITIQUE: Check for CI configuration (GitHub Actions, etc.)
-- Evaluate if CI runs: `cargo clippy --all-targets`, `cargo test --all-features`, `cargo fmt --check`
+- VGV requires automated linting + testing + coverage on every PR — evaluate Rust equivalent:
+  - `cargo fmt --check` (formatting)
+  - `cargo clippy --workspace --all-targets -- -D warnings` (linting)
+  - `cargo test --workspace` (testing)
+  - `cargo llvm-cov` with threshold (coverage)
 - Check for coverage enforcement in CI
 - Assess if `deny.toml` or `cargo-deny` is configured for dependency auditing
+
+**Conventions (VGV: Conventional Commits + Semantic Versioning):**
+- CRITIQUE: Check if commit messages follow Conventional Commits spec
+- Assess if releases follow Semantic Versioning
+- Evaluate if a changelog is maintained (VGV: Keep a Changelog)
 
 **Tooling:**
 - CRITIQUE: Evaluate presence of:
@@ -149,6 +194,7 @@ Develop a **DETAILED** Markdown-formatted assessment document `RUST_ASSESSMENT.m
   - `deny.toml` for license/advisory auditing
   - `cargo-audit` for security advisories
   - Pre-commit hooks for formatting/linting
+  - Spell checking in CI (VGV runs spell check on PRs)
 
 ---
 
@@ -160,11 +206,13 @@ Develop a **DETAILED** Markdown-formatted assessment document `RUST_ASSESSMENT.m
 - Evaluate builder patterns vs large argument lists
 - Assess if `pub` visibility is minimized (prefer `pub(crate)`)
 
-**Documentation:**
+**Documentation (VGV: Diátaxis + Code Documentation):**
 - CRITIQUE: Check for `#![deny(missing_docs)]` on library crates
-- Assess rustdoc coverage on public items
-- Evaluate README quality — setup, architecture, examples
+- Assess rustdoc coverage on public items — every public function, struct, enum, and trait should have `///` docs
+- Check that fallible functions document error conditions with `# Errors` sections
+- Evaluate README quality — setup, architecture, examples (VGV: reduce onboarding cost)
 - Check for doc-tests on public API examples
+- Assess if documentation follows Diátaxis framework (tutorials, how-to, reference, explanation)
 
 ---
 
@@ -327,4 +375,5 @@ Be thorough, critical, and specific. Every critique should be backed by concrete
 
 ## Reference
 
-Full methodology documentation: https://github.com/kylecrouse/rust-code-assessment
+- Methodology: https://github.com/VGVentures/rust-code-assessment
+- VGV Engineering Best Practices: https://engineering.verygood.ventures/
