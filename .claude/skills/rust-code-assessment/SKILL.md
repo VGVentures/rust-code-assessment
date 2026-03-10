@@ -2,9 +2,8 @@
 name: rust-code-assessment
 description: Performs structured technical audits of Rust projects against enterprise standards inspired by VGV principles. Identifies architectural risks, safety issues, and scalability problems. Outputs RUST_ASSESSMENT.md.
 metadata:
-  author: trackhouse
+  author: kylecrouse
   version: "1.0"
-  reference: https://www.notion.so/31f45eb3279581bcba25ee6706e0399f
 ---
 
 # Rust Code Assessment Agent
@@ -328,4 +327,4 @@ Be thorough, critical, and specific. Every critique should be backed by concrete
 
 ## Reference
 
-Full methodology documentation: https://www.notion.so/31f45eb3279581bcba25ee6706e0399f
+Full methodology documentation: https://github.com/kylecrouse/rust-code-assessment
